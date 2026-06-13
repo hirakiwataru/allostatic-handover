@@ -384,6 +384,63 @@ class TestMjlabFullHandoverAssets(unittest.TestCase):
         finally:
             env.close()
 
+    def test_handover_intent_cue_recovers_from_withdrawing_gradually(self) -> None:
+        cfg = allostatic_handover_full_task_only_speech_yam_env_cfg(play=True)
+        cfg.scene.num_envs = 1
+        env = ManagerBasedRlEnv(cfg=cfg, device="cpu", render_mode=None)
+        try:
+            env.reset()
+            command = env.command_manager.get_term("handover")
+            command.human_readiness[:] = command.cfg.readiness_threshold
+            command.readiness_belief[:] = command.cfg.readiness_threshold
+            command.attention_load[:] = command.cfg.withdrawal_threshold + 0.5
+            command.turn_taking_load[:] = 0.0
+            command.proxemic_stress[:] = 0.0
+            command.human_waiting_cost[:] = 0.0
+            command.human_reach_effort[:] = 0.0
+            command.motor_adaptation_cost[:] = 0.0
+            command.allostatic_load_total[:] = command.cfg.withdrawal_threshold + 0.5
+            command.human_state_id[:] = int(HumanState.WITHDRAWING)
+
+            announce = robot_speech_to_scalar(RobotSpeechToken.ANNOUNCE_HANDOVER)
+            cue_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, announce]], device=env.device)
+            env.action_manager.process_action(cue_action)
+            command._last_update_step = -1
+            command.pre_reward_update()
+
+            self.assertGreater(float(command.withdrawal_recovery[0]), 0.0)
+            self.assertNotEqual(int(command.human_state_id[0]), int(HumanState.READY))
+            self.assertIn(
+                int(command.human_state_id[0]),
+                {int(HumanState.OVERLOADED), int(HumanState.WITHDRAWING)},
+            )
+
+            silence = robot_speech_to_scalar(RobotSpeechToken.SILENCE)
+            silent_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, silence]], device=env.device)
+            env.action_manager.process_action(silent_action)
+            for _ in range(16):
+                command._last_update_step = -1
+                command.pre_reward_update()
+
+            self.assertGreaterEqual(
+                float(command.human_readiness[0]),
+                command.cfg.readiness_threshold,
+            )
+            self.assertIn(
+                int(command.human_state_id[0]),
+                {int(HumanState.READY), int(HumanState.GRASPING)},
+            )
+            self.assertLess(
+                float(
+                    command.allostatic_load_total[0]
+                    - command.withdrawal_recovery[0]
+                    * command.cfg.withdrawal_recovery_load_relief
+                ),
+                command.cfg.overload_threshold,
+            )
+        finally:
+            env.close()
+
     def test_full_task_only_grasped_start_keeps_old_curriculum_shortcut(self) -> None:
         cfg = allostatic_handover_full_task_only_grasped_start_yam_env_cfg()
         command = cfg.commands["handover"]

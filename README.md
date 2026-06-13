@@ -88,7 +88,7 @@ make mjlab-play-full-task-only-speech MJLAB_DISPLAY=:1 MJLAB_XAUTHORITY=/run/use
 | SpeechPenalty | `Mjlab-Allostatic-Handover-Full-SpeechPenalty` | TaskOnlySpeechと同じ公開観測のみ | 隠れspeech loadの指数型ペナルティ `-0.04` | 発話頻度を負荷が蓄積しない範囲に抑える |
 | AllostaticBelief | `Mjlab-Allostatic-Handover-Full-AllostaticBelief` | 公開観測 + frozen world-model belief。真値/proxyなし | 指数型speech penalty `-0.02`、load penalty `-0.05`、waiting penalty `-0.10` | beliefで隠れ状態を推定し、成功率と負荷低減を両立する |
 
-3条件ともactorとcriticの両方から真の `human_state_id`、`human_readiness`、`allostatic_load_total`、`readiness_belief`、`load_proxy` を外しています。hidden loadは観測には入りませんが、ログ、readiness decay、FSM遷移には使われます。FSM遷移の閾値は共通で `overload_threshold=7.0`、`withdrawal_threshold=9.0` です。
+3条件ともactorとcriticの両方から真の `human_state_id`、`human_readiness`、`allostatic_load_total`、`readiness_belief`、`load_proxy` を外しています。hidden loadは観測には入りませんが、ログ、readiness decay、FSM遷移には使われます。FSM遷移の閾値は共通で `overload_threshold=7.0`、`withdrawal_threshold=9.0` です。`WITHDRAWING` 中でもロボットが `ANNOUNCE_HANDOVER`（「今から渡します」）を出すと、hidden な `withdrawal_recovery` が一定時間かけて上がり、FSM判定に使う実効loadだけを下げます。これにより、人は即座にREADYへ飛ぶのではなく、渡す意思を受けて `WITHDRAWING -> OVERLOADED -> READY/GRASPING` へ緩やかに戻れます。ログ・報酬用のload本体は消さず、負荷が残っていることは比較指標として記録します。
 
 共通action:
 

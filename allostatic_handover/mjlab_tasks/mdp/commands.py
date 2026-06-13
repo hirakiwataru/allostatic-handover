@@ -113,6 +113,10 @@ class AllostaticHandoverCommandCfg(CommandTermCfg):
   speech_penalty_load_threshold: float = 0.8
   speech_penalty_exp_scale: float = 0.5
   speech_penalty_max_excess: float = 4.0
+  withdrawal_recovery_steps: int = 120
+  withdrawal_recovery_rate: float = 0.08
+  withdrawal_recovery_decay: float = 0.02
+  withdrawal_recovery_load_relief: float = 4.0
   reach_effort_cost: float = 0.22
   close_distance: float = 0.18
   proxemic_stress_gain: float = 0.65
@@ -275,6 +279,12 @@ class AllostaticHandoverCommand(CommandTerm):
     self.human_readiness = torch.zeros(self.num_envs, device=self.device)
     self.readiness_belief = torch.zeros(self.num_envs, device=self.device)
     self.readiness_hold = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+    self.withdrawal_recovery = torch.zeros(self.num_envs, device=self.device)
+    self.withdrawal_recovery_hold = torch.zeros(
+      self.num_envs,
+      dtype=torch.long,
+      device=self.device,
+    )
     self.human_state_id = torch.full(
       (self.num_envs,),
       int(HumanState.HESITANT),
@@ -498,6 +508,30 @@ class AllostaticHandoverCommand(CommandTerm):
       torch.full_like(self.readiness_hold, self.cfg.readiness_hold_steps),
       self.readiness_hold,
     )
+
+    handover_intent_cue = token == int(RobotSpeechToken.ANNOUNCE_HANDOVER)
+    withdrawal_like = (
+      (self.human_state_id == int(HumanState.WITHDRAWING))
+      | (self.allostatic_load_total >= self.cfg.withdrawal_threshold)
+    )
+    start_withdrawal_recovery = handover_intent_cue & withdrawal_like
+    self.withdrawal_recovery_hold = torch.where(
+      start_withdrawal_recovery,
+      torch.full_like(self.withdrawal_recovery_hold, self.cfg.withdrawal_recovery_steps),
+      self.withdrawal_recovery_hold,
+    )
+    recovery_active = self.withdrawal_recovery_hold > 0
+    self.withdrawal_recovery_hold = torch.clamp(
+      self.withdrawal_recovery_hold - 1,
+      min=0,
+    )
+    self.withdrawal_recovery = torch.where(
+      recovery_active,
+      self.withdrawal_recovery
+      + self.cfg.withdrawal_recovery_rate * (1.0 - self.withdrawal_recovery),
+      self.withdrawal_recovery * (1.0 - self.cfg.withdrawal_recovery_decay),
+    )
+    self.withdrawal_recovery = torch.clamp(self.withdrawal_recovery, 0.0, 1.0)
 
     in_hold = self.readiness_hold > 0
     self.readiness_hold = torch.clamp(self.readiness_hold - 1, min=0)
@@ -794,13 +828,18 @@ class AllostaticHandoverCommand(CommandTerm):
       torch.full_like(state, int(HumanState.GRASPING)),
       state,
     )
+    effective_load_for_state = torch.clamp(
+      self.allostatic_load_total
+      - self.withdrawal_recovery * self.cfg.withdrawal_recovery_load_relief,
+      min=0.0,
+    )
     state = torch.where(
-      self.allostatic_load_total >= self.cfg.overload_threshold,
+      effective_load_for_state >= self.cfg.overload_threshold,
       torch.full_like(state, int(HumanState.OVERLOADED)),
       state,
     )
     state = torch.where(
-      self.allostatic_load_total >= self.cfg.withdrawal_threshold,
+      effective_load_for_state >= self.cfg.withdrawal_threshold,
       torch.full_like(state, int(HumanState.WITHDRAWING)),
       state,
     )
@@ -872,6 +911,8 @@ class AllostaticHandoverCommand(CommandTerm):
     self.human_readiness[env_ids] = initial_readiness
     self.readiness_belief[env_ids] = initial_readiness
     self.readiness_hold[env_ids] = 0
+    self.withdrawal_recovery[env_ids] = 0.0
+    self.withdrawal_recovery_hold[env_ids] = 0
     self.human_state_id[env_ids] = (
       int(HumanState.READY) if self.cfg.pure_task_mode else int(HumanState.HESITANT)
     )
