@@ -1,0 +1,17 @@
+robot_speech:
+  - silence
+  - announce_handover
+  - ask_ready
+  - reassure
+  - say_waiting
+  - say_releasing
+  - ask_confirmation
+human_speech:
+  - silence
+  - ready
+  - wait
+  - closer
+  - slower
+  - got_it
+  - too_close
+  - confused

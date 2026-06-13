@@ -1,0 +1,13 @@
+env_name: AllostaticRobotHumanHandoverCart
+backend: hrgym
+robot_type: Schunk
+horizon: 1000
+reward_variant: task_only
+speech_mode: learned
+privileged_observation: false
+use_camera_obs: false
+use_object_obs: true
+has_renderer: false
+has_offscreen_renderer: false
+done_at_success: true
+done_at_collision: false

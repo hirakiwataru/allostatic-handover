@@ -1,0 +1,24 @@
+human_states:
+  READY: 0
+  HESITANT: 1
+  DISTRACTED: 2
+  OVERLOADED: 3
+  WITHDRAWING: 4
+  GRASPING: 5
+fsm:
+  overload_threshold: 3.0
+  withdrawal_threshold: 5.0
+  too_close_distance: 0.16
+  repeated_ask_ready_limit: 3
+  hesitation_recovery_load: 2.5
+readiness:
+  initial: 0.20
+  threshold: 0.55
+  adaptive_threshold: 0.42
+  decay: 0.004
+  belief_decay: 0.003
+  readiness_hold_steps: 160
+  readiness_hold_floor: 0.72
+  readiness_hold_tokens:
+    - ANNOUNCE_HANDOVER
+    - SAY_RELEASING

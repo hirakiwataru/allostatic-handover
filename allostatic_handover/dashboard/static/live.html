@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mjlab Live Diagnostics</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --line: #d8dee8;
+      --text: #17202c;
+      --muted: #687386;
+      --ok: #0f8a4b;
+      --bad: #c92a2a;
+      --blue: #2458d3;
+      --amber: #b66a00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1 {
+      margin: 0;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+    select, button {
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 0 10px;
+      font-size: 14px;
+    }
+    button { cursor: pointer; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(380px, 0.9fr) minmax(440px, 1.1fr);
+      gap: 12px;
+      padding: 12px;
+    }
+    section {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .head {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px;
+    }
+    .metric {
+      border: 1px solid #edf0f5;
+      border-radius: 6px;
+      padding: 8px;
+      min-height: 62px;
+    }
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .value {
+      margin-top: 4px;
+      font-size: 18px;
+      font-weight: 650;
+    }
+    .conversation {
+      height: 330px;
+      overflow: auto;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    .utterance {
+      display: grid;
+      grid-template-columns: 74px 1fr;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #edf0f5;
+    }
+    .step {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .charts {
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+    }
+    canvas {
+      width: 100%;
+      height: 145px;
+      border: 1px solid #edf0f5;
+      border-radius: 6px;
+      background: #fff;
+    }
+    .gates {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px;
+    }
+    .gate {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 13px;
+    }
+    .gate.ok { border-color: #9ad5b4; background: #effaf3; }
+    .gate.bad { border-color: #f0aaa9; background: #fff1f1; }
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 920px) {
+      header { flex-wrap: wrap; }
+      main { grid-template-columns: 1fr; }
+      .grid, .gates { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mjlab Live Diagnostics</h1>
+    <select id="runSelect"></select>
+    <button id="refresh">Refresh</button>
+    <span class="small" id="status">waiting</span>
+  </header>
+  <main>
+    <div>
+      <section>
+        <div class="head"><span>Current State</span><span id="stepLabel">step -</span></div>
+        <div class="grid" id="metrics"></div>
+      </section>
+      <section style="margin-top:12px">
+        <div class="head"><span>Handoff Gates</span><span id="gateHint"></span></div>
+        <div class="gates" id="gates"></div>
+      </section>
+      <section style="margin-top:12px">
+        <div class="head"><span>Speech Log</span><span id="speechSummary"></span></div>
+        <div class="conversation" id="conversation"></div>
+      </section>
+    </div>
+    <section>
+      <div class="head"><span>Trends</span><span id="lastSpeech"></span></div>
+      <div class="charts">
+        <canvas id="readinessChart"></canvas>
+        <canvas id="loadChart"></canvas>
+        <canvas id="distanceChart"></canvas>
+        <canvas id="phaseChart"></canvas>
+      </div>
+    </section>
+  </main>
+  <script>
+    const runSelect = document.getElementById('runSelect');
+    const state = { runs: [], records: [], timer: null };
+    const phaseMap = { APPROACH: 0, REACH_OUT: 1, RETREAT: 2, COMPLETE: 3 };
+
+    async function loadRuns() {
+      const res = await fetch('/api/live-runs');
+      state.runs = await res.json();
+      runSelect.innerHTML = state.runs.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+      if (state.runs.length && !runSelect.value) runSelect.value = state.runs[0].id;
+      await loadSelected();
+    }
+
+    async function loadSelected() {
+      if (!runSelect.value) {
+        document.getElementById('status').textContent = 'no live runs';
+        return;
+      }
+      const res = await fetch('/api/live-run?limit=2500&run=' + encodeURIComponent(runSelect.value));
+      const data = await res.json();
+      state.records = data.records || [];
+      render();
+    }
+
+    function latest() {
+      return state.records[state.records.length - 1] || {};
+    }
+
+    function render() {
+      const row = latest();
+      document.getElementById('status').textContent = state.records.length ? 'live' : 'waiting';
+      document.getElementById('stepLabel').textContent = `step ${row.step ?? '-'}`;
+      document.getElementById('lastSpeech').textContent = row.robot_speech_text || row.robot_speech_token || '';
+      renderMetrics(row);
+      renderGates(row);
+      renderConversation();
+      drawChart('readinessChart', [
+        { name: 'readiness', color: '#2458d3', values: series('human_readiness') },
+        { name: 'belief', color: '#0f8a4b', values: series('readiness_belief') },
+      ], 0, 1);
+      drawChart('loadChart', [
+        { name: 'load', color: '#b66a00', values: series('allostatic_load_total') },
+        { name: 'turn', color: '#8f3fb0', values: series('turn_taking_load') },
+      ]);
+      drawChart('distanceChart', [
+        { name: 'palm_distance', color: '#c92a2a', values: series('palm_distance') },
+        { name: 'threshold', color: '#687386', values: series('success_threshold') },
+      ], 0);
+      drawChart('phaseChart', [
+        { name: 'phase', color: '#2458d3', values: state.records.map(r => phaseMap[r.phase] ?? 0) },
+        { name: 'reach', color: '#0f8a4b', values: series('reach_progress') },
+      ], 0, 3);
+    }
+
+    function renderMetrics(row) {
+      const items = [
+        ['speech', row.robot_speech_token || '-'],
+        ['human_state', row.human_state || '-'],
+        ['phase', row.phase || '-'],
+        ['readiness', fmt(row.human_readiness)],
+        ['load', fmt(row.allostatic_load_total)],
+        ['palm_distance', fmt(row.palm_distance)],
+        ['threshold', fmt(row.success_threshold)],
+        ['grasped', yes(row.robot_object_grasped)],
+        ['attached', yes(row.object_attached)],
+        ['success', fmt(row.episode_success)],
+        ['max_lift', fmt(row.max_object_lift)],
+        ['hold', row.readiness_hold ?? '-'],
+      ];
+      document.getElementById('metrics').innerHTML = items.map(([k, v]) =>
+        `<div class="metric"><div class="label">${k}</div><div class="value">${v}</div></div>`
+      ).join('');
+    }
+
+    function renderGates(row) {
+      const gates = row.gates || {};
+      const labels = ['ready', 'reaching', 'reach_progress', 'distance', 'release', 'lift', 'grasp', 'handoff_now'];
+      document.getElementById('gates').innerHTML = labels.map(name => {
+        const ok = Boolean(gates[name]);
+        return `<div class="gate ${ok ? 'ok' : 'bad'}"><strong>${name}</strong><br>${ok ? 'OK' : 'BLOCKED'}</div>`;
+      }).join('');
+      document.getElementById('gateHint').textContent =
+        labels.filter(name => !gates[name]).join(', ') || 'all gates passed';
+    }
+
+    function renderConversation() {
+      const rows = state.records
+        .filter(r => r.robot_speech_token && r.robot_speech_token !== 'SILENCE')
+        .slice(-80)
+        .reverse();
+      document.getElementById('speechSummary').textContent = `${rows.length} recent`;
+      document.getElementById('conversation').innerHTML = rows.map(r =>
+        `<div class="utterance"><div class="step">${r.step}</div><div><strong>${r.robot_speech_token}</strong><br>${r.robot_speech_text || ''}</div></div>`
+      ).join('');
+    }
+
+    function series(key) {
+      return state.records.map(row => Number(row[key] || 0));
+    }
+
+    function drawChart(id, lines, ymin = null, ymax = null) {
+      const canvas = document.getElementById(id);
+      const ctx = canvas.getContext('2d');
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.strokeStyle = '#edf0f5';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, rect.width - 1, rect.height - 1);
+      const values = lines.flatMap(line => line.values);
+      let lo = ymin ?? Math.min(...values, 0);
+      let hi = ymax ?? Math.max(...values, 1);
+      if (!Number.isFinite(lo)) lo = 0;
+      if (!Number.isFinite(hi)) hi = 1;
+      if (Math.abs(hi - lo) < 1e-6) hi = lo + 1;
+      const pad = { l: 42, r: 10, t: 18, b: 22 };
+      const w = Math.max(1, rect.width - pad.l - pad.r);
+      const h = Math.max(1, rect.height - pad.t - pad.b);
+      ctx.fillStyle = '#687386';
+      ctx.font = '12px system-ui';
+      ctx.fillText(`${hi.toFixed(2)}`, 6, pad.t + 4);
+      ctx.fillText(`${lo.toFixed(2)}`, 6, pad.t + h);
+      for (const line of lines) {
+        const vals = line.values.slice(-240);
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        vals.forEach((v, i) => {
+          const x = pad.l + (vals.length <= 1 ? 0 : i * w / (vals.length - 1));
+          const y = pad.t + h - (Number(v) - lo) * h / (hi - lo);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+      let x = pad.l;
+      for (const line of lines) {
+        ctx.fillStyle = line.color;
+        ctx.fillText(line.name, x, rect.height - 6);
+        x += 110;
+      }
+    }
+
+    function fmt(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(3) : '-';
+    }
+    function yes(value) {
+      return value ? 'yes' : 'no';
+    }
+
+    document.getElementById('refresh').addEventListener('click', loadRuns);
+    runSelect.addEventListener('change', loadSelected);
+    loadRuns();
+    state.timer = setInterval(loadSelected, 1000);
+  </script>
+</body>
+</html>

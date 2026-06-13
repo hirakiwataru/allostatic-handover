@@ -1,0 +1,8 @@
+reward_variant: allostatic
+weights:
+  allostatic_load: 0.12
+  forced_waiting: 0.04
+  proxemic_stress: 0.08
+  human_reach_effort: 0.06
+  excessive_speech: 0.03
+  uncomfortable_contact: 0.08

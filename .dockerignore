@@ -1,0 +1,14 @@
+.git
+.conda
+.dreamerv3-venv
+.uvcache
+outputs
+runs
+models
+wandb
+assets/vendor/human_robot_gym
+MUJOCO_LOG.TXT
+__pycache__
+*.pyc
+.pytest_cache
+*.egg-info

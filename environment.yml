@@ -1,0 +1,15 @@
+name: allostatic-handover
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip>=24
+  - setuptools
+  - wheel
+  - cmake
+  - ninja
+  - pybind11
+  - tmux
+  - pip:
+      - -e ../human-robot-gym[training]
+      - -e .[training]

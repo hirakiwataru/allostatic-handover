@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "allostatic-handover"
+version = "0.1.0"
+description = "Allostatic robot-to-human handover MVP using human-robot-gym without modifying it."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+]
+
+[project.optional-dependencies]
+hrgym = []
+training = [
+  "stable-baselines3",
+  "wandb",
+  "tensorboard",
+  "pyyaml",
+]
+dev = [
+  "pytest",
+]
+mjlab = []
+
+[project.scripts]
+allostatic-scripted = "allostatic_handover.experiments.run_scripted_rollouts:main"
+allostatic-train-ppo = "allostatic_handover.experiments.train_ppo:main"
+allostatic-train-ppo-comparison = "allostatic_handover.experiments.train_ppo_comparison:main"
+allostatic-eval-ppo = "allostatic_handover.experiments.eval_ppo:main"
+allostatic-eval-degeneracy = "allostatic_handover.experiments.eval_degenerate_policy:main"
+allostatic-dashboard = "allostatic_handover.dashboard.app:main"
+allostatic-plot-summary = "allostatic_handover.analysis.plot_summary_svg:main"
+allostatic-hrgym-exact-rhh-sac = "allostatic_handover.experiments.hrgym_exact_rhh_sac:main"
+
+[project.entry-points."mjlab.tasks"]
+allostatic_handover = "allostatic_handover.mjlab_tasks"
+
+[tool.setuptools.packages.find]
+include = ["allostatic_handover*"]

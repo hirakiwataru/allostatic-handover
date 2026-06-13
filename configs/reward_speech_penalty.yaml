@@ -1,0 +1,3 @@
+reward_variant: speech_penalty
+weights:
+  speech_count: 0.03

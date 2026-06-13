@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Allostatic Handover Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --line: #d8dde6;
+      --text: #1f2933;
+      --muted: #667085;
+      --robot: #2563eb;
+      --human: #059669;
+      --object: #d97706;
+      --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1 {
+      font-size: 16px;
+      line-height: 1;
+      margin: 0;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    select, button, input {
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 0 10px;
+      font-size: 14px;
+    }
+    button { cursor: pointer; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(360px, 1.15fr) minmax(340px, 0.85fr);
+      gap: 12px;
+      padding: 12px;
+      min-height: calc(100vh - 56px);
+    }
+    section {
+      min-width: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .section-head {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    #scene {
+      display: block;
+      width: 100%;
+      height: min(54vh, 520px);
+      background: #eef2f7;
+    }
+    .right {
+      display: grid;
+      grid-template-rows: 230px 1fr;
+      gap: 12px;
+    }
+    .conversation {
+      padding: 10px 12px;
+      overflow: auto;
+      height: 188px;
+      font-size: 14px;
+    }
+    .utterance {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #eef1f5;
+    }
+    .speaker { color: var(--muted); font-size: 12px; }
+    .charts {
+      display: grid;
+      grid-template-rows: 1fr 1fr 1fr;
+      gap: 8px;
+      padding: 10px;
+    }
+    canvas.chart {
+      width: 100%;
+      height: 150px;
+      border: 1px solid #eef1f5;
+      border-radius: 6px;
+      background: #fff;
+    }
+    .timeline {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+    }
+    input[type="range"] { width: 100%; padding: 0; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .metric {
+      border: 1px solid #eef1f5;
+      border-radius: 6px;
+      padding: 8px;
+      min-height: 58px;
+    }
+    .metric .label { color: var(--muted); font-size: 12px; }
+    .metric .value { font-size: 18px; font-weight: 650; margin-top: 4px; }
+    @media (max-width: 900px) {
+      header { flex-wrap: wrap; height: auto; min-height: 56px; padding: 10px; }
+      main { grid-template-columns: 1fr; }
+      .right { grid-template-rows: auto auto; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Allostatic Handover</h1>
+    <select id="runSelect" title="Run"></select>
+    <button id="reload">Reload</button>
+    <button id="play">Play</button>
+  </header>
+  <main>
+    <section>
+      <div class="section-head"><span>Environment</span><span id="stepLabel">step 0 / 0</span></div>
+      <canvas id="scene"></canvas>
+      <div class="metrics" id="metrics"></div>
+      <div class="timeline">
+        <input id="timeline" type="range" min="0" max="0" value="0">
+        <span id="stateLabel">READY</span>
+      </div>
+    </section>
+    <div class="right">
+      <section>
+        <div class="section-head"><span>Conversation</span><span id="speechLabel"></span></div>
+        <div class="conversation" id="conversation"></div>
+      </section>
+      <section>
+        <div class="section-head"><span>Hidden State And Load</span><span id="loadLabel"></span></div>
+        <div class="charts">
+          <canvas class="chart" id="loadChart"></canvas>
+          <canvas class="chart" id="stateChart"></canvas>
+          <canvas class="chart" id="speechChart"></canvas>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const runSelect = document.getElementById('runSelect');
+    const timeline = document.getElementById('timeline');
+    const scene = document.getElementById('scene');
+    const ctx = scene.getContext('2d');
+    const state = { runs: [], steps: [], index: 0, timer: null };
+
+    async function loadRuns() {
+      const res = await fetch('/api/runs');
+      state.runs = await res.json();
+      runSelect.innerHTML = state.runs.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+      if (state.runs.length) await loadRun(state.runs[0].id);
+    }
+
+    async function loadRun(id) {
+      const res = await fetch('/api/run?run=' + encodeURIComponent(id));
+      const data = await res.json();
+      state.steps = data.steps || [];
+      state.index = 0;
+      timeline.max = Math.max(0, state.steps.length - 1);
+      timeline.value = 0;
+      render();
+    }
+
+    function currentInfo() {
+      const step = state.steps[state.index] || {};
+      return step.info || {};
+    }
+
+    function render() {
+      resizeCanvas(scene);
+      drawScene();
+      drawConversation();
+      drawMetrics();
+      drawCharts();
+      const info = currentInfo();
+      document.getElementById('stepLabel').textContent = `step ${state.index + 1} / ${state.steps.length}`;
+      document.getElementById('stateLabel').textContent = info.human_state || 'READY';
+      document.getElementById('loadLabel').textContent = Number(info.allostatic_load_total || 0).toFixed(3);
+      document.getElementById('speechLabel').textContent = info.robot_speech || '';
+    }
+
+    function resizeCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+    }
+
+    function toXY(pos) {
+      const x = Array.isArray(pos) ? pos[0] : 0;
+      const y = Array.isArray(pos) ? pos[1] : 0;
+      const w = scene.width;
+      const h = scene.height;
+      return [w * (0.18 + x * 0.68), h * (0.72 - y * 0.82)];
+    }
+
+    function drawScene() {
+      const info = currentInfo();
+      ctx.clearRect(0, 0, scene.width, scene.height);
+      ctx.fillStyle = '#eef2f7';
+      ctx.fillRect(0, 0, scene.width, scene.height);
+      drawGrid();
+      drawPoint(info.human_hand_pos, '#059669', 'human');
+      drawPoint(info.object_pos, '#d97706', 'object');
+      drawPoint(info.robot_eef_pos, '#2563eb', 'robot');
+      const robot = toXY(info.robot_eef_pos);
+      const obj = toXY(info.object_pos);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(robot[0], robot[1]);
+      ctx.lineTo(obj[0], obj[1]);
+      ctx.stroke();
+    }
+
+    function drawGrid() {
+      ctx.strokeStyle = '#d8dde6';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 8; i++) {
+        const x = (i + 1) * scene.width / 9;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, scene.height); ctx.stroke();
+      }
+      for (let i = 0; i < 5; i++) {
+        const y = (i + 1) * scene.height / 6;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(scene.width, y); ctx.stroke();
+      }
+    }
+
+    function drawPoint(pos, color, label) {
+      const [x, y] = toXY(pos);
+      const radius = Math.max(9, scene.width * 0.015);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#111827';
+      ctx.font = `${Math.max(12, scene.width * 0.018)}px system-ui`;
+      ctx.fillText(label, x + radius + 6, y + 4);
+    }
+
+    function drawConversation() {
+      const container = document.getElementById('conversation');
+      const rows = [];
+      for (const step of state.steps.slice(0, state.index + 1)) {
+        const conv = (step.info && step.info.conversation) || [];
+        for (const item of conv) rows.push(item);
+      }
+      container.innerHTML = rows.slice(-80).map(item =>
+        `<div class="utterance"><div class="speaker">${escapeHtml(item.speaker || '')}</div><div>${escapeHtml(item.text || item.token || '')}</div></div>`
+      ).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function drawMetrics() {
+      const info = currentInfo();
+      const values = [
+        ['success', info.success ? '1' : '0'],
+        ['load', fixed(info.allostatic_load_total)],
+        ['speech', info.robot_speech_count || 0],
+        ['waiting', fixed(info.human_waiting_time)],
+        ['reach', fixed(info.human_reach_effort)],
+        ['trust', fixed(info.trust)],
+        ['overload', info.overload_count || 0],
+        ['withdrawal', info.withdrawal_count || 0],
+      ];
+      document.getElementById('metrics').innerHTML = values.map(([label, value]) =>
+        `<div class="metric"><div class="label">${label}</div><div class="value">${value}</div></div>`
+      ).join('');
+    }
+
+    function drawCharts() {
+      drawLineChart(document.getElementById('loadChart'), 'allostatic_load_total', '#dc2626', 0);
+      drawLineChart(document.getElementById('stateChart'), 'human_state_id', '#059669', 0);
+      drawLineChart(document.getElementById('speechChart'), 'robot_speech_count', '#2563eb', 0);
+    }
+
+    function drawLineChart(canvas, key, color, minValue) {
+      resizeCanvas(canvas);
+      const c = canvas.getContext('2d');
+      const values = state.steps.map(s => Number((s.info || {})[key] || 0));
+      const max = Math.max(minValue + 1e-6, ...values);
+      c.clearRect(0, 0, canvas.width, canvas.height);
+      c.fillStyle = '#fff';
+      c.fillRect(0, 0, canvas.width, canvas.height);
+      c.strokeStyle = '#eef1f5';
+      c.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const y = i * canvas.height / 4;
+        c.beginPath(); c.moveTo(0, y); c.lineTo(canvas.width, y); c.stroke();
+      }
+      c.strokeStyle = color;
+      c.lineWidth = 2;
+      c.beginPath();
+      values.forEach((value, i) => {
+        const x = values.length <= 1 ? 0 : i * canvas.width / (values.length - 1);
+        const y = canvas.height - (value - minValue) / (max - minValue) * (canvas.height - 18) - 9;
+        if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      });
+      c.stroke();
+      c.fillStyle = '#667085';
+      c.font = '12px system-ui';
+      c.fillText(key, 8, 16);
+      const x = values.length <= 1 ? 0 : state.index * canvas.width / (values.length - 1);
+      c.strokeStyle = '#111827';
+      c.beginPath(); c.moveTo(x, 0); c.lineTo(x, canvas.height); c.stroke();
+    }
+
+    function fixed(value) {
+      return Number(value || 0).toFixed(3);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    runSelect.addEventListener('change', event => loadRun(event.target.value));
+    timeline.addEventListener('input', event => { state.index = Number(event.target.value); render(); });
+    document.getElementById('reload').addEventListener('click', loadRuns);
+    document.getElementById('play').addEventListener('click', () => {
+      if (state.timer) {
+        clearInterval(state.timer);
+        state.timer = null;
+        return;
+      }
+      state.timer = setInterval(() => {
+        state.index = Math.min(state.steps.length - 1, state.index + 1);
+        timeline.value = state.index;
+        render();
+        if (state.index >= state.steps.length - 1) {
+          clearInterval(state.timer);
+          state.timer = null;
+        }
+      }, 120);
+    });
+    window.addEventListener('resize', render);
+    loadRuns();
+  </script>
+</body>
+</html>

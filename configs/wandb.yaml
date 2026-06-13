@@ -1,0 +1,9 @@
+wandb:
+  enabled: true
+  project: allostatic-handover-mvp
+  entity: null
+  group: degeneracy-check
+  mode: offline
+  log_video: false
+  log_interval_steps: 1000
+  eval_interval_steps: 10000
