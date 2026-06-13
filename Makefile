@@ -1,4 +1,4 @@
-.PHONY: smoke scripted dashboard mujoco-viewer mjlab-install mjlab-list-envs mjlab-check-display mjlab-check-full-layout mjlab-diagnose-full-task-only mjlab-render-random-animations mjlab-play-yam mjlab-play-full mjlab-play-full-allostatic mjlab-play-full-random-animations mjlab-play-full-task-only mjlab-play-full-task-only-speech mjlab-play-full-task-only-speech-trained mjlab-play-full-task-only-speech-trained-live mjlab-play-full-speech-penalty mjlab-play-full-speech-penalty-trained mjlab-play-full-allostatic-belief-trained mjlab-play-full-task-only-trained mjlab-play-full-task-only-trained-no-reset mjlab-play-full-task-only-grasped-start mjlab-train-yam-smoke mjlab-train-yam-smoke-cpu mjlab-train-yam-wandb-gpu mjlab-train-full-smoke mjlab-train-full-wandb-gpu mjlab-train-full-grasped-start-smoke mjlab-train-full-grasped-start-wandb-gpu tmux-mjlab-train-full-grasped-start-wandb-gpu tail-mjlab-full-grasped-start mjlab-train-full-task-only-smoke mjlab-train-full-task-only-visual-explore mjlab-train-full-task-only-wandb-gpu tmux-mjlab-train-full-task-only-wandb-gpu tail-mjlab-full-task-only mjlab-train-full-task-only-speech-smoke mjlab-train-full-task-only-speech-wandb-gpu tmux-mjlab-train-full-task-only-speech-wandb-gpu tail-mjlab-full-task-only-speech mjlab-train-full-speech-penalty-smoke mjlab-train-full-speech-penalty-wandb-gpu tmux-mjlab-train-full-speech-penalty-wandb-gpu tail-mjlab-full-speech-penalty mjlab-collect-world-model-dataset-smoke mjlab-collect-world-model-dataset-smoke-cpu dreamer-train-world-model-smoke dreamerv3-exact-venv dreamerv3-exact-check-deps dreamerv3-exact-check-jax-cpu dreamerv3-exact-check-jax-gpu dreamer-train-world-model-exact-smoke dreamer-train-world-model-exact-gpu-smoke tmux-dreamer-train-world-model-exact tail-dreamer-world-model-exact mjlab-train-full-allostatic-belief-smoke tmux-dreamer-train-world-model tmux-mjlab-train-full-allostatic-belief-wandb-gpu tail-dreamer-world-model tail-mjlab-full-allostatic-belief mjlab-eval-full-task-only mjlab-eval-full-task-only-speech mjlab-eval-full-speech-penalty mjlab-eval-full-allostatic-belief mjlab-eval-full-grasped-start mjlab-eval-full-task-only-grasped-start copy-hrgym-assets copy-hrgym-full-assets eval-ppo-original-handover-stable-gui ppo-hrgym-smoke eval-ppo-hrgym-smoke ppo-allostatic-safe-ik-smoke eval-ppo-allostatic-safe-ik-smoke ppo-allostatic-compare-safe-ik tmux-ppo-allostatic-compare-safe-ik tail-ppo-allostatic-compare-safe-ik ppo-original-handover-wandb ppo-original-handover-bc-smoke eval-ppo-original-handover-bc-smoke test
+.PHONY: smoke scripted dashboard mujoco-viewer mjlab-install mjlab-list-envs mjlab-check-display mjlab-check-full-layout mjlab-diagnose-full-task-only mjlab-render-random-animations mjlab-play-yam mjlab-play-full mjlab-play-full-allostatic mjlab-play-full-random-animations mjlab-play-full-task-only mjlab-play-full-task-only-speech mjlab-play-full-task-only-speech-trained mjlab-play-full-task-only-speech-trained-live mjlab-play-full-speech-penalty mjlab-play-full-speech-penalty-trained mjlab-play-full-allostatic-belief-trained mjlab-play-full-task-only-trained mjlab-play-full-task-only-trained-no-reset mjlab-play-full-task-only-grasped-start mjlab-train-yam-smoke mjlab-train-yam-smoke-cpu mjlab-train-yam-wandb-gpu mjlab-train-full-smoke mjlab-train-full-wandb-gpu mjlab-train-full-grasped-start-smoke mjlab-train-full-grasped-start-wandb-gpu tmux-mjlab-train-full-grasped-start-wandb-gpu tail-mjlab-full-grasped-start mjlab-train-full-task-only-smoke mjlab-train-full-task-only-visual-explore mjlab-train-full-task-only-wandb-gpu tmux-mjlab-train-full-task-only-wandb-gpu tail-mjlab-full-task-only mjlab-train-full-task-only-speech-smoke mjlab-train-full-task-only-speech-wandb-gpu tmux-mjlab-train-full-task-only-speech-wandb-gpu tail-mjlab-full-task-only-speech mjlab-train-full-speech-penalty-smoke mjlab-train-full-speech-penalty-wandb-gpu tmux-mjlab-train-full-speech-penalty-wandb-gpu tail-mjlab-full-speech-penalty mjlab-train-three-condition-sequence-wandb-gpu tmux-mjlab-train-three-condition-sequence-wandb-gpu tail-mjlab-three-condition-sequence mjlab-collect-world-model-dataset-smoke mjlab-collect-world-model-dataset-smoke-cpu dreamer-train-world-model-smoke dreamerv3-exact-venv dreamerv3-exact-check-deps dreamerv3-exact-check-jax-cpu dreamerv3-exact-check-jax-gpu dreamer-train-world-model-exact-smoke dreamer-train-world-model-exact-gpu-smoke tmux-dreamer-train-world-model-exact tail-dreamer-world-model-exact mjlab-train-full-allostatic-belief-smoke tmux-dreamer-train-world-model tmux-mjlab-train-full-allostatic-belief-wandb-gpu tail-dreamer-world-model tail-mjlab-full-allostatic-belief mjlab-eval-full-task-only mjlab-eval-full-task-only-speech mjlab-eval-full-speech-penalty mjlab-eval-full-allostatic-belief mjlab-eval-full-grasped-start mjlab-eval-full-task-only-grasped-start copy-hrgym-assets copy-hrgym-full-assets eval-ppo-original-handover-stable-gui ppo-hrgym-smoke eval-ppo-hrgym-smoke ppo-allostatic-safe-ik-smoke eval-ppo-allostatic-safe-ik-smoke ppo-allostatic-compare-safe-ik tmux-ppo-allostatic-compare-safe-ik tail-ppo-allostatic-compare-safe-ik ppo-original-handover-wandb ppo-original-handover-bc-smoke eval-ppo-original-handover-bc-smoke test
 
 MJLAB_DISPLAY ?= :1
 MJLAB_XAUTHORITY ?= /run/user/$(shell id -u)/gdm/Xauthority
@@ -7,6 +7,16 @@ WM_DATASET ?= /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/world
 WM_OUTPUT_DIR ?= /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/world_model/latest
 WM_MODEL ?= /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/world_model/latest/belief_distill.pt
 DREAMERV3_PY ?= /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.dreamerv3-venv/bin/python
+THREE_CONDITION_SESSION ?= allostatic_three_condition_ppo_sequence
+THREE_CONDITION_RUN_ID := $(if $(THREE_CONDITION_RUN_ID),$(THREE_CONDITION_RUN_ID),$(shell date +%Y%m%d_%H%M%S))
+GPU_ID ?= 0
+NUM_ENVS ?= 64
+MAX_ITER ?= 500
+WM_STEPS ?= 4096
+WM_UPDATES ?= 5000
+WM_NUM_ENVS ?= $(NUM_ENVS)
+WM_BATCH_SIZE ?= 64
+WM_SEQ_LEN ?= 64
 
 smoke:
 	python -m allostatic_handover.experiments.run_scripted_rollouts --backend mock --policy excessive_speech --episodes 2 --horizon 80 --output-dir outputs/smoke_excessive
@@ -144,6 +154,18 @@ tmux-mjlab-train-full-speech-penalty-wandb-gpu:
 
 tail-mjlab-full-speech-penalty:
 	tail -f outputs/mjlab_full_speech_penalty_fixed_animation_object_64env_500iter/run.log
+
+mjlab-train-three-condition-sequence-wandb-gpu:
+	RUN_ID=$(THREE_CONDITION_RUN_ID) GPU_ID=$(GPU_ID) NUM_ENVS=$(NUM_ENVS) MAX_ITER=$(MAX_ITER) WM_NUM_ENVS=$(WM_NUM_ENVS) WM_STEPS=$(WM_STEPS) WM_UPDATES=$(WM_UPDATES) WM_BATCH_SIZE=$(WM_BATCH_SIZE) WM_SEQ_LEN=$(WM_SEQ_LEN) scripts/run_mjlab_three_condition_ppo_sequence.sh
+
+tmux-mjlab-train-three-condition-sequence-wandb-gpu:
+	mkdir -p outputs/mjlab_three_condition_compare/$(THREE_CONDITION_RUN_ID) && ./.conda/bin/tmux new-session -d -s $(THREE_CONDITION_SESSION) "cd /mnt/k_iwamoto/sim_data/Projects/allostatic-handover && RUN_ID=$(THREE_CONDITION_RUN_ID) GPU_ID=$(GPU_ID) NUM_ENVS=$(NUM_ENVS) MAX_ITER=$(MAX_ITER) WM_NUM_ENVS=$(WM_NUM_ENVS) WM_STEPS=$(WM_STEPS) WM_UPDATES=$(WM_UPDATES) WM_BATCH_SIZE=$(WM_BATCH_SIZE) WM_SEQ_LEN=$(WM_SEQ_LEN) scripts/run_mjlab_three_condition_ppo_sequence.sh > outputs/mjlab_three_condition_compare/$(THREE_CONDITION_RUN_ID)/tmux.log 2>&1"
+	@echo "Started tmux session $(THREE_CONDITION_SESSION)"
+	@echo "Run log: outputs/mjlab_three_condition_compare/$(THREE_CONDITION_RUN_ID)/run.log"
+	@echo "Attach: ./.conda/bin/tmux attach -t $(THREE_CONDITION_SESSION)"
+
+tail-mjlab-three-condition-sequence:
+	tail -f $$(ls -dt outputs/mjlab_three_condition_compare/*/run.log | head -n 1)
 
 mjlab-collect-world-model-dataset-smoke: mjlab-install
 	cd /mnt/k_iwamoto/sim_data/Projects/mjlab && UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache XDG_CACHE_HOME=/mnt/k_iwamoto/sim_data/tmp/xdg_cache MPLCONFIGDIR=/mnt/k_iwamoto/sim_data/tmp/matplotlib CUDA_VISIBLE_DEVICES=0 MUJOCO_GL=egl uv run python /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/scripts/collect_mjlab_world_model_dataset.py --output $(WM_DATASET) --num-envs 8 --steps 256 --seed 101 --device cuda:0 --policy mixed

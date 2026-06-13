@@ -34,6 +34,10 @@ def main() -> None:
   )
   parser.add_argument("--delta-pos-scale", type=float, default=0.10)
   parser.add_argument("--release-distance", type=float, default=0.28)
+  parser.add_argument("--wandb-mode", choices=("disabled", "offline", "online"), default="disabled")
+  parser.add_argument("--wandb-project", default="allostatic-handover-mjlab")
+  parser.add_argument("--wandb-group", default=None)
+  parser.add_argument("--wandb-run-name", default=None)
   args = parser.parse_args()
 
   os.environ.setdefault("MUJOCO_GL", "egl")
@@ -142,6 +146,7 @@ def main() -> None:
     json.dumps(metadata, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
   )
+  _log_wandb(args, metadata, stacked)
   print(json.dumps(metadata, indent=2, sort_keys=True))
 
 
@@ -237,6 +242,41 @@ def _scripted_action(
 
 def _cpu(tensor: torch.Tensor) -> np.ndarray:
   return tensor.detach().cpu().numpy()
+
+
+def _log_wandb(
+  args: argparse.Namespace,
+  metadata: dict[str, object],
+  stacked: dict[str, np.ndarray],
+) -> None:
+  if args.wandb_mode == "disabled":
+    return
+  import wandb
+
+  run = wandb.init(
+    project=args.wandb_project,
+    group=args.wandb_group,
+    name=args.wandb_run_name,
+    mode=args.wandb_mode,
+    config=metadata,
+  )
+  try:
+    done = stacked["done"].astype(bool)
+    speech = stacked["action"][..., 4]
+    metrics = {
+      "world_model_dataset/steps": float(metadata["steps"]),
+      "world_model_dataset/num_envs": float(metadata["num_envs"]),
+      "world_model_dataset/public_obs_dim": float(metadata["public_obs_dim"]),
+      "world_model_dataset/action_dim": float(metadata["action_dim"]),
+      "world_model_dataset/done_ratio": float(done.mean()),
+      "world_model_dataset/reward_mean": float(stacked["reward"].mean()),
+      "world_model_dataset/readiness_mean": float(stacked["human_readiness"].mean()),
+      "world_model_dataset/load_mean": float(stacked["allostatic_load_total"].mean()),
+      "world_model_dataset/speech_abs_mean": float(np.abs(speech).mean()),
+    }
+    run.log(metrics)
+  finally:
+    run.finish()
 
 
 if __name__ == "__main__":

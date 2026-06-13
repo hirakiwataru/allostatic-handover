@@ -372,6 +372,31 @@ make tmux-mjlab-train-full-allostatic-belief-wandb-gpu \
 make tail-mjlab-full-allostatic-belief
 ```
 
+3条件を1つのtmux session内で順番に本格学習する場合:
+
+```bash
+cd /mnt/k_iwamoto/sim_data/Projects/allostatic-handover
+make tmux-mjlab-train-three-condition-sequence-wandb-gpu
+make tail-mjlab-three-condition-sequence
+```
+
+この順次runは `TaskOnlySpeech -> SpeechPenalty -> world-model dataset収集 -> belief world model学習 -> AllostaticBelief PPO` の順に実行します。全stageを同じ W&B project `allostatic-handover-mjlab` と group `three_condition_compare_<RUN_ID>` に送ります。dataset収集は既定では既存collectorの `mixed` rolloutを使い、PPO runtimeには生成された `outputs/mjlab_three_condition_compare/<RUN_ID>/world_model/belief_distill.pt` を渡します。各stage終了後は `SLEEP_SECONDS` 秒待ってから次stageへ進み、途中で失敗した場合は後続stageを実行しません。
+
+smokeとして短く確認する場合:
+
+```bash
+cd /mnt/k_iwamoto/sim_data/Projects/allostatic-handover
+NUM_ENVS=8 MAX_ITER=2 WM_STEPS=128 WM_UPDATES=10 SLEEP_SECONDS=2 \
+  make mjlab-train-three-condition-sequence-wandb-gpu
+```
+
+本格runの主な上書き可能変数:
+
+```bash
+GPU_ID=0 NUM_ENVS=64 MAX_ITER=500 WM_STEPS=4096 WM_UPDATES=5000 \
+  make tmux-mjlab-train-three-condition-sequence-wandb-gpu
+```
+
 AllostaticBelief policyを評価する場合:
 
 ```bash
