@@ -69,6 +69,7 @@ def main() -> None:
     reward_sum = torch.zeros(env.num_envs, device=device)
     length_sum = 0.0
     last_log: dict[str, float] = {}
+    episode_log_sums: dict[str, float] = {}
 
     for _step in range(max_steps):
       with torch.inference_mode():
@@ -89,10 +90,15 @@ def main() -> None:
       completed += done_count
       reward_sum[dones.bool()] = 0.0
       last_log = {key: _scalar(value) for key, value in log.items()}
+      for key, value in last_log.items():
+        episode_log_sums[key] = episode_log_sums.get(key, 0.0) + value * done_count
       if completed >= args.episodes:
         break
 
     episodes = max(completed, 1)
+    episode_log_means = {
+      key: value / episodes for key, value in sorted(episode_log_sums.items())
+    }
     result = {
       "task_id": args.task_id,
       "checkpoint_file": str(Path(args.checkpoint_file).resolve()),
@@ -105,6 +111,63 @@ def main() -> None:
       "num_envs": args.num_envs,
       "seed": args.seed,
       "max_steps": max_steps,
+      "episode_log_means": episode_log_means,
+      "speech_metrics": {
+        "robot_speech_count": _first_present(
+          episode_log_means,
+          "Episode_Metrics/speech/robot_speech_count",
+          "Metrics/handover/robot_speech_count",
+        ),
+        "silence_ratio": _first_present(
+          episode_log_means,
+          "Episode_Metrics/speech/silence_ratio",
+          "Metrics/handover/silence_ratio",
+        ),
+        "repeated_speech_count": _first_present(
+          episode_log_means,
+          "Episode_Metrics/speech/repeated_speech_count",
+          "Metrics/handover/repeated_speech_count",
+        ),
+      },
+      "handover_metrics": {
+        "palm_distance": _first_present(
+          episode_log_means,
+          "Episode_Metrics/handover/palm_distance",
+          "Metrics/handover/palm_distance",
+        ),
+        "robot_object_grasped": _first_present(
+          episode_log_means,
+          "Episode_Metrics/handover/robot_object_grasped",
+          "Metrics/handover/robot_object_grasped",
+        ),
+        "object_attached": _first_present(
+          episode_log_means,
+          "Episode_Metrics/handover/object_attached",
+          "Metrics/handover/object_attached",
+        ),
+        "human_reach_progress": _first_present(
+          episode_log_means,
+          "Episode_Metrics/human_reach_progress",
+          "Metrics/handover/human_reach_progress",
+        ),
+      },
+      "allostatic_metrics": {
+        "load_mean": _first_present(
+          episode_log_means,
+          "Episode_Metrics/allostasis/load_mean",
+          "Metrics/handover/allostatic_load",
+        ),
+        "attention_load": _first_present(
+          episode_log_means,
+          "Episode_Metrics/allostasis/attention_load",
+          "Metrics/handover/attention_load",
+        ),
+        "turn_taking_load": _first_present(
+          episode_log_means,
+          "Episode_Metrics/allostasis/turn_taking_load",
+          "Metrics/handover/turn_taking_load",
+        ),
+      },
       "last_episode_log": last_log,
     }
   finally:
@@ -121,6 +184,13 @@ def _scalar(value: Any) -> float:
   if isinstance(value, torch.Tensor):
     return float(value.detach().mean().cpu())
   return float(value)
+
+
+def _first_present(values: dict[str, float], *keys: str) -> float | None:
+  for key in keys:
+    if key in values:
+      return values[key]
+  return None
 
 
 if __name__ == "__main__":
