@@ -287,6 +287,8 @@ def allostatic_handover_yam_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "actor": ObservationGroupCfg(actor_terms, enable_corruption=False),
     "critic": ObservationGroupCfg(critic_terms, enable_corruption=False),
   }
+  for group in cfg.observations.values():
+    group.nan_policy = "sanitize"
 
   cfg.rewards = {
     "handover": RewardTermCfg(
@@ -339,6 +341,7 @@ def allostatic_handover_yam_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg.terminations = {
     "time_out": TerminationTermCfg(func=velocity_mdp.time_out, time_out=True),
+    "nan_state": TerminationTermCfg(func=velocity_mdp.nan_detection),
     "handover_complete": TerminationTermCfg(
       func=mdp.handover_complete,
       params={"command_name": "handover"},
@@ -881,6 +884,40 @@ def allostatic_handover_full_allostatic_belief_yam_env_cfg(
       func=mdp.wm_load_pred,
       params=wm_params,
     )
+
+  cfg.rewards["speech_penalty"] = RewardTermCfg(
+    func=mdp.speech_penalty,
+    weight=-0.02,
+    params={"command_name": "handover"},
+  )
+  cfg.rewards["allostatic_load"] = RewardTermCfg(
+    func=mdp.allostatic_load_penalty,
+    weight=-0.05,
+    params={"command_name": "handover"},
+  )
+  cfg.rewards["waiting_cost"] = RewardTermCfg(
+    func=mdp.waiting_cost,
+    weight=-0.10,
+    params={"command_name": "handover"},
+  )
+  return cfg
+
+
+def allostatic_handover_full_dreamerv3_allostatic_yam_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create the exact DreamerV3 allostatic policy-learning condition.
+
+  This task keeps the same handover dynamics, 5D motor+speech action, hidden
+  FSM, and allostatic reward terms as ``AllostaticBelief``. Unlike the PPO
+  learned-belief condition, it does not add frozen PyTorch world-model outputs
+  to the Mjlab observation groups. The exact DreamerV3 bridge reads
+  ``world_model_public_obs`` directly and stores hidden values only as replay
+  auxiliary labels.
+  """
+  cfg = allostatic_handover_full_task_only_speech_yam_env_cfg(play=play)
+  command = cfg.commands["handover"]
+  command.reward_variant = "allostatic"
 
   cfg.rewards["speech_penalty"] = RewardTermCfg(
     func=mdp.speech_penalty,

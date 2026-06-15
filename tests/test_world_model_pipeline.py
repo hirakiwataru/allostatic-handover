@@ -25,6 +25,13 @@ from allostatic_handover.dreamerv3_exact.dataset import (
 from allostatic_handover.dreamerv3_exact.dependencies import (
     check_dreamerv3_dependencies,
 )
+from allostatic_handover.dreamerv3_exact.mjlab_bridge import (
+    ACTION_KEY,
+    LABEL_KEYS,
+    OBS_KEYS,
+    make_policy_obs,
+    make_replay_transition,
+)
 
 
 class WorldModelPipelineTest(unittest.TestCase):
@@ -128,6 +135,42 @@ class WorldModelPipelineTest(unittest.TestCase):
         )
         self.assertFalse(status.ok)
         self.assertIn("definitely_missing_allostatic_test_module", status.missing)
+
+    def test_dreamerv3_mjlab_policy_obs_excludes_hidden_labels(self) -> None:
+        arrays = self._arrays(time=1, num_envs=2)
+        step = {
+            "public_obs": arrays["public_obs"][0],
+            "reward": arrays["reward"][0],
+            "is_first": np.ones(2, dtype=bool),
+            "is_last": np.zeros(2, dtype=bool),
+            "is_terminal": np.zeros(2, dtype=bool),
+            "human_state_id": arrays["human_state_id"][0].astype(np.int32),
+            "human_readiness": arrays["human_readiness"][0],
+            "allostatic_load_total": arrays["allostatic_load_total"][0],
+        }
+        policy_obs = make_policy_obs(step)
+        self.assertEqual(set(policy_obs), set(OBS_KEYS))
+        for key in LABEL_KEYS:
+            self.assertNotIn(key, policy_obs)
+
+    def test_dreamerv3_mjlab_replay_transition_keeps_aux_labels(self) -> None:
+        arrays = self._arrays(time=1, num_envs=2)
+        step = {
+            "public_obs": arrays["public_obs"][0],
+            "reward": arrays["reward"][0],
+            "is_first": np.ones(2, dtype=bool),
+            "is_last": np.zeros(2, dtype=bool),
+            "is_terminal": np.zeros(2, dtype=bool),
+            "human_state_id": arrays["human_state_id"][0].astype(np.int32),
+            "human_readiness": arrays["human_readiness"][0],
+            "allostatic_load_total": arrays["allostatic_load_total"][0],
+        }
+        transition = make_replay_transition(step, arrays["action"][0])
+        self.assertEqual(transition[ACTION_KEY].shape, (2, 5))
+        for key in OBS_KEYS:
+            self.assertIn(key, transition)
+        for key in LABEL_KEYS:
+            self.assertIn(key, transition)
 
 
 if __name__ == "__main__":

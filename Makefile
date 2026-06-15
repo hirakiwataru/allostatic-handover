@@ -17,6 +17,16 @@ WM_UPDATES ?= 5000
 WM_NUM_ENVS ?= $(NUM_ENVS)
 WM_BATCH_SIZE ?= 64
 WM_SEQ_LEN ?= 64
+DREAMERV3_POLICY_LOGDIR ?= /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/dreamerv3_mjlab_policy/full
+DREAMERV3_POLICY_STEPS ?= 500000
+DREAMERV3_POLICY_NUM_ENVS ?= 16
+DREAMERV3_POLICY_BATCH_SIZE ?= 16
+DREAMERV3_POLICY_BATCH_LENGTH ?= 64
+DREAMERV3_POLICY_TRAIN_RATIO ?= 32
+DREAMERV3_POLICY_SESSION ?= dreamerv3_exact_mjlab_policy
+DREAMERV3_POLICY_CKPT ?= $(DREAMERV3_POLICY_LOGDIR)/policy.ckpt
+
+.PHONY: dreamerv3-exact-mjlab-venv dreamerv3-mjlab-policy-smoke tmux-dreamerv3-mjlab-policy-wandb tail-dreamerv3-mjlab-policy dreamerv3-mjlab-policy-eval dreamerv3-mjlab-policy-play
 
 smoke:
 	python -m allostatic_handover.experiments.run_scripted_rollouts --backend mock --policy excessive_speech --episodes 2 --horizon 80 --output-dir outputs/smoke_excessive
@@ -177,10 +187,10 @@ dreamer-train-world-model-smoke: mjlab-collect-world-model-dataset-smoke
 	cd /mnt/k_iwamoto/sim_data/Projects/mjlab && PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache XDG_CACHE_HOME=/mnt/k_iwamoto/sim_data/tmp/xdg_cache MPLCONFIGDIR=/mnt/k_iwamoto/sim_data/tmp/matplotlib CUDA_VISIBLE_DEVICES=0 uv run python /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/scripts/train_dreamer_world_model.py --dataset $(WM_DATASET) --output-dir $(WM_OUTPUT_DIR) --updates 100 --batch-size 16 --seq-len 32 --device cuda:0 --dreamerv3-path /mnt/k_iwamoto/sim_data/Projects/dreamerv3
 
 dreamerv3-exact-venv:
-	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv venv --python python3 /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.dreamerv3-venv
+	test -x $(DREAMERV3_PY) || UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv venv --python python3 /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.dreamerv3-venv
 	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) -r /mnt/k_iwamoto/sim_data/Projects/dreamerv3/requirements.txt
-	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) --no-deps -e /mnt/k_iwamoto/sim_data/Projects/dreamerv3
-	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) --no-deps -e /mnt/k_iwamoto/sim_data/Projects/allostatic-handover
+	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) --no-deps --no-build-isolation -e /mnt/k_iwamoto/sim_data/Projects/dreamerv3
+	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) --no-deps --no-build-isolation -e /mnt/k_iwamoto/sim_data/Projects/allostatic-handover
 
 dreamerv3-exact-check-deps:
 	PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover $(DREAMERV3_PY) scripts/check_dreamerv3_exact_dependencies.py --fail
@@ -190,6 +200,29 @@ dreamerv3-exact-check-jax-cpu:
 
 dreamerv3-exact-check-jax-gpu:
 	PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_PREALLOCATE=false $(DREAMERV3_PY) scripts/check_dreamerv3_jax_runtime.py --platform cuda --fail
+
+dreamerv3-exact-mjlab-venv: dreamerv3-exact-venv
+	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) uv_build
+	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) --no-build-isolation -e /mnt/k_iwamoto/sim_data/Projects/mjlab
+	UV_CACHE_DIR=/mnt/k_iwamoto/sim_data/Projects/allostatic-handover/.uvcache uv pip install --python $(DREAMERV3_PY) --no-deps --no-build-isolation -e /mnt/k_iwamoto/sim_data/Projects/allostatic-handover
+
+dreamerv3-mjlab-policy-smoke: dreamerv3-exact-check-deps
+	PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/mjlab/src:/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover CUDA_VISIBLE_DEVICES= XLA_PYTHON_CLIENT_PREALLOCATE=false MUJOCO_GL=egl $(DREAMERV3_PY) scripts/train_dreamerv3_mjlab_policy.py --logdir /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/dreamerv3_mjlab_policy/smoke --steps 2000 --num-envs 2 --device cpu --configs debug --jax-platform cpu --batch-size 4 --batch-length 16 --train-ratio 8 --prefill-steps 64 --log-every 256 --save-every 1000 --wandb-mode disabled
+
+tmux-dreamerv3-mjlab-policy-wandb:
+	mkdir -p $(DREAMERV3_POLICY_LOGDIR) && ./.conda/bin/tmux new-session -d -s $(DREAMERV3_POLICY_SESSION) "cd /mnt/k_iwamoto/sim_data/Projects/allostatic-handover && PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/mjlab/src:/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover CUDA_VISIBLE_DEVICES=$(GPU_ID) XLA_PYTHON_CLIENT_PREALLOCATE=false MUJOCO_GL=egl $(DREAMERV3_PY) scripts/train_dreamerv3_mjlab_policy.py --logdir $(DREAMERV3_POLICY_LOGDIR) --steps $(DREAMERV3_POLICY_STEPS) --num-envs $(DREAMERV3_POLICY_NUM_ENVS) --device cuda:0 --configs size1m --jax-platform cuda --batch-size $(DREAMERV3_POLICY_BATCH_SIZE) --batch-length $(DREAMERV3_POLICY_BATCH_LENGTH) --train-ratio $(DREAMERV3_POLICY_TRAIN_RATIO) --prefill-steps 2000 --log-every 5000 --save-every 50000 --wandb-mode online --wandb-project allostatic-handover-mjlab --wandb-run-name dreamerv3_exact_mjlab_allostatic_seed101 > $(DREAMERV3_POLICY_LOGDIR)/run.log 2>&1"
+	@echo "Started tmux session $(DREAMERV3_POLICY_SESSION)"
+	@echo "Run log: $(DREAMERV3_POLICY_LOGDIR)/run.log"
+	@echo "Attach: ./.conda/bin/tmux attach -t $(DREAMERV3_POLICY_SESSION)"
+
+tail-dreamerv3-mjlab-policy:
+	tail -f $(DREAMERV3_POLICY_LOGDIR)/run.log
+
+dreamerv3-mjlab-policy-eval:
+	PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/mjlab/src:/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover CUDA_VISIBLE_DEVICES=$(GPU_ID) XLA_PYTHON_CLIENT_PREALLOCATE=false MUJOCO_GL=egl $(DREAMERV3_PY) scripts/evaluate_dreamerv3_mjlab_policy.py --checkpoint $(DREAMERV3_POLICY_CKPT) --episodes 64 --num-envs 16 --device cuda:0 --jax-platform cuda --output /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/dreamerv3_mjlab_policy/eval.json
+
+dreamerv3-mjlab-policy-play:
+	PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/mjlab/src:/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover DISPLAY=$(MJLAB_DISPLAY) XAUTHORITY=$(MJLAB_XAUTHORITY) CUDA_VISIBLE_DEVICES=$(GPU_ID) XLA_PYTHON_CLIENT_PREALLOCATE=false MUJOCO_GL=glfw $(DREAMERV3_PY) scripts/evaluate_dreamerv3_mjlab_policy.py --checkpoint $(DREAMERV3_POLICY_CKPT) --episodes 4 --num-envs 1 --device cuda:0 --jax-platform cuda --output /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/dreamerv3_mjlab_policy/play_eval.json
 
 dreamer-train-world-model-exact-smoke: mjlab-collect-world-model-dataset-smoke-cpu dreamerv3-exact-check-deps
 	PYTHONPATH=/mnt/k_iwamoto/sim_data/Projects/dreamerv3:/mnt/k_iwamoto/sim_data/Projects/allostatic-handover CUDA_VISIBLE_DEVICES= XLA_PYTHON_CLIENT_PREALLOCATE=false $(DREAMERV3_PY) scripts/train_dreamerv3_exact_world_model.py --dataset $(WM_DATASET) --output-dir /mnt/k_iwamoto/sim_data/Projects/allostatic-handover/outputs/world_model/dreamerv3_exact_smoke --updates 2 --batch-size 4 --batch-length 8 --configs debug --jax-platform cpu --dreamerv3-path /mnt/k_iwamoto/sim_data/Projects/dreamerv3

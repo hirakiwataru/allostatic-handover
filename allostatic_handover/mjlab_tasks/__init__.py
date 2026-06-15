@@ -6,6 +6,7 @@ from mjlab.tasks.registry import register_mjlab_task
 
 from .env_cfg import (
   allostatic_handover_full_allostatic_belief_yam_env_cfg,
+  allostatic_handover_full_dreamerv3_allostatic_yam_env_cfg,
   allostatic_handover_full_grasped_start_yam_env_cfg,
   allostatic_handover_full_speech_penalty_yam_env_cfg,
   allostatic_handover_full_task_only_grasped_start_yam_env_cfg,
@@ -16,6 +17,7 @@ from .env_cfg import (
 )
 from .rl_cfg import (
   allostatic_handover_full_allostatic_belief_yam_ppo_runner_cfg,
+  allostatic_handover_full_dreamerv3_allostatic_yam_ppo_runner_cfg,
   allostatic_handover_full_grasped_start_yam_ppo_runner_cfg,
   allostatic_handover_full_speech_penalty_yam_ppo_runner_cfg,
   allostatic_handover_full_task_only_grasped_start_yam_ppo_runner_cfg,
@@ -73,6 +75,13 @@ register_mjlab_task(
   env_cfg=allostatic_handover_full_allostatic_belief_yam_env_cfg(),
   play_env_cfg=allostatic_handover_full_allostatic_belief_yam_env_cfg(play=True),
   rl_cfg=allostatic_handover_full_allostatic_belief_yam_ppo_runner_cfg(),
+)
+
+register_mjlab_task(
+  task_id="Mjlab-Allostatic-Handover-Full-DreamerV3Allostatic",
+  env_cfg=allostatic_handover_full_dreamerv3_allostatic_yam_env_cfg(),
+  play_env_cfg=allostatic_handover_full_dreamerv3_allostatic_yam_env_cfg(play=True),
+  rl_cfg=allostatic_handover_full_dreamerv3_allostatic_yam_ppo_runner_cfg(),
 )
 
 register_mjlab_task(

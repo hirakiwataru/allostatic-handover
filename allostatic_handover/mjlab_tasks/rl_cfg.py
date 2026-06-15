@@ -51,6 +51,12 @@ def allostatic_handover_full_allostatic_belief_yam_ppo_runner_cfg() -> RslRlOnPo
   return cfg
 
 
+def allostatic_handover_full_dreamerv3_allostatic_yam_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  cfg = allostatic_handover_full_task_only_speech_yam_ppo_runner_cfg()
+  cfg.experiment_name = "allostatic_handover_full_dreamerv3_allostatic_yam"
+  return cfg
+
+
 def allostatic_handover_full_grasped_start_yam_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   cfg = allostatic_handover_full_yam_ppo_runner_cfg()
   cfg.experiment_name = "allostatic_handover_full_grasped_start_yam"
